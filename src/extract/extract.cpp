@@ -1,4 +1,5 @@
 #include "extract/extract.hpp"
+#include "config/config.hpp"
 
 #include <pe-parse/parse.h>
 
@@ -93,9 +94,9 @@ namespace {
 
     std::string getDllPath() {
         // overriden path
-        const char* dllPath = getenv("LSFG_DLL_PATH");
-        if (dllPath && *dllPath != '\0')
-            return{dllPath};
+        std::string dllPath = Config::activeConf.dll;
+        if (!dllPath.empty())
+            return dllPath;
         // home based paths
         const char* home = getenv("HOME");
         const std::string homeStr = home ? home : "";
@@ -124,6 +125,11 @@ void Extract::extractShaders() {
         throw std::runtime_error("Unable to read Lossless.dll, is it installed?");
     peparse::IterRsrc(dll, on_resource, nullptr);
     peparse::DestructParsedPE(dll);
+
+    // ensure all shaders are present
+    for (const auto& [name, idx] : nameIdxTable)
+        if (shaders().find(idx) == shaders().end())
+            throw std::runtime_error("Shader not found: " + name + ".\n- Is Lossless Scaling up to date?");
 }
 
 std::vector<uint8_t> Extract::getShader(const std::string& name) {

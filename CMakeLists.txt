@@ -1,24 +1,19 @@
 cmake_minimum_required(VERSION 3.28)
 
-set(CMAKE_C_COMPILER clang)
-set(CMAKE_CXX_COMPILER clang++)
-
 set(CMAKE_SKIP_RPATH ON)
-
-if(CMAKE_BUILD_TYPE STREQUAL "Release")
-    add_definitions("-DLSFG_NO_DEBUG")
-endif()
 
 # subprojects
 add_compile_options(-fPIC
     -Wno-deprecated-declarations
-    -Wno-unused-template)
+    -Wno-unused-template
+    -Wno-tautological-compare
+    -Wno-undef)
 
-add_subdirectory(dxbc EXCLUDE_FROM_ALL)
-add_subdirectory(pe-parse/pe-parser-library EXCLUDE_FROM_ALL)
-add_subdirectory(lsfg-vk-common)
-add_subdirectory(lsfg-vk-v3.1)
-add_subdirectory(lsfg-vk-v3.1p)
+add_subdirectory(thirdparty/dxbc EXCLUDE_FROM_ALL)
+add_subdirectory(thirdparty/pe-parse/pe-parser-library EXCLUDE_FROM_ALL)
+add_subdirectory(thirdparty/toml11 EXCLUDE_FROM_ALL)
+add_subdirectory(thirdparty/raylib EXCLUDE_FROM_ALL)
+add_subdirectory(framegen)
 
 # main project
 project(lsfg-vk
@@ -27,6 +22,7 @@ project(lsfg-vk
     LANGUAGES CXX)
 
 file(GLOB SOURCES
+    "src/config/*.cpp"
     "src/extract/*.cpp"
     "src/mini/*.cpp"
     "src/utils/*.cpp"
@@ -42,8 +38,11 @@ set_target_properties(lsfg-vk PROPERTIES
 target_include_directories(lsfg-vk
     PRIVATE include)
 target_link_libraries(lsfg-vk PRIVATE
-    lsfg-vk-common lsfg-vk-v3.1 lsfg-vk-v3.1p
-    pe-parse dxbc vulkan)
+    pe-parse dxbc toml11 raylib
+    lsfg-vk-framegen vulkan)
+
+get_target_property(TOML11_INCLUDE_DIRS toml11 INTERFACE_INCLUDE_DIRECTORIES)
+target_include_directories(lsfg-vk SYSTEM PRIVATE ${TOML11_INCLUDE_DIRS})
 
 if(CMAKE_BUILD_TYPE STREQUAL "Release")
     set_target_properties(lsfg-vk PROPERTIES

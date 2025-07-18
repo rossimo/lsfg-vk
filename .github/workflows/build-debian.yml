@@ -1,5 +1,7 @@
 name: Build lsfg-vk on Debian
-on: [push]
+on:
+  push:
+    branches: ["develop"]
 
 jobs:
   build-debian:
@@ -21,14 +23,15 @@ jobs:
           clang clang-tools llvm \
           git tar \
           cmake ninja-build \
-          spirv-headers libvulkan-dev
+          spirv-headers libvulkan-dev \
+          xorg-dev xutils-dev
     - name: Checkout repository
       uses: actions/checkout@v4
       with:
         submodules: true
     - name: Configure with CMake and Ninja
       run: |
-        cmake -B build -G Ninja \
+        CC=clang CXX=clang++ cmake -B build -G Ninja \
           -DCMAKE_BUILD_TYPE=Release \
           -DCMAKE_INSTALL_PREFIX=./build-release
     - name: Build with Ninja

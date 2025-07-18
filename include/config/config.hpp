@@ -1,0 +1,72 @@
+#pragma once
+
+#include <vulkan/vulkan_core.h>
+
+#include <cstddef>
+#include <vector>
+#include <atomic>
+#include <memory>
+#include <string>
+
+namespace Config {
+
+    /// lsfg-vk configuration
+    struct Configuration {
+        /// Whether lsfg-vk should be loaded in the first place.
+        bool enable{false};
+        /// Path to Lossless.dll.
+        std::string dll;
+        /// Additional environment variables to set.
+        std::vector<std::pair<std::string, std::string>> env;
+
+        /// The frame generation muliplier
+        size_t multiplier{2};
+        /// The internal flow scale factor
+        float flowScale{1.0F};
+        /// Whether performance mode is enabled
+        bool performance{false};
+        /// Whether HDR is enabled
+        bool hdr{false};
+
+        /// Experimental flag for overriding the synchronization method.
+        VkPresentModeKHR e_present;
+        /// Experimental flag for limiting the framerate of DXVK games.
+        uint32_t e_fps_limit;
+
+        /// Atomic property to check if the configuration is valid or outdated.
+        std::shared_ptr<std::atomic_bool> valid;
+    };
+
+    /// Active configuration. Must be set in main.cpp.
+    extern Configuration activeConf;
+
+    ///
+    /// Load the config file and create a file watcher.
+    ///
+    /// @param file The path to the configuration file.
+    ///
+    /// @throws std::runtime_error if an error occurs while loading the configuration file.
+    ///
+    void loadAndWatchConfig(const std::string& file);
+
+    ///
+    /// Reread the configuration file while preserving the old configuration
+    /// in case of an error.
+    ///
+    /// @param file The path to the configuration file.
+    ///
+    /// @throws std::runtime_error if an error occurs while loading the configuration file.
+    ///
+    void updateConfig(const std::string& file);
+
+    ///
+    /// Get the configuration for a game.
+    ///
+    /// @param name The name of the executable to fetch.
+    /// @return The configuration for the game or global configuration.
+    ///
+    /// @throws std::runtime_error if the configuration is invalid.
+    ///
+    Configuration getConfig(const std::pair<std::string, std::string>& name);
+
+}

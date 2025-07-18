@@ -1,5 +1,7 @@
 name: Build lsfg-vk on Arch Linux
-on: [push]
+on:
+  push:
+    branches: ["develop"]
 
 jobs:
   build-arch:
@@ -18,14 +20,15 @@ jobs:
           base-devel git \
           clang llvm \
           cmake ninja \
-          spirv-headers vulkan-headers vulkan-icd-loader
+          spirv-headers vulkan-headers vulkan-icd-loader \
+          xorg
     - name: Checkout repository
       uses: actions/checkout@v4
       with:
         submodules: true
     - name: Configure with CMake and Ninja
       run: |
-        cmake -B build -G Ninja \
+        CC=clang CXX=clang++ cmake -B build -G Ninja \
           -DCMAKE_BUILD_TYPE=Release \
           -DCMAKE_INSTALL_PREFIX=./build-release
     - name: Build with Ninja

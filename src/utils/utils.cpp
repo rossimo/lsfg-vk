@@ -1,16 +1,24 @@
 #include "utils/utils.hpp"
-#include "utils/log.hpp"
 #include "common/exception.hpp"
 #include "layer.hpp"
 
 #include <vulkan/vulkan_core.h>
+#include <sys/types.h>
+#include <string.h> // NOLINT
+#include <unistd.h>
 
-#include <cstdint>
-#include <cstring>
+#include <unordered_map>
 #include <algorithm>
 #include <optional>
+#include <iostream>
+#include <cstdlib>
+#include <cstdint>
+#include <cstring>
 #include <utility>
+#include <fstream>
+#include <string>
 #include <vector>
+#include <array>
 
 using namespace Utils;
 
@@ -74,12 +82,8 @@ std::vector<const char*> Utils::addExtensions(const char* const* extensions, siz
             [e](const char* extName) {
                 return std::string(extName) == std::string(e);
             });
-        if (it == ext.end()) {
-            Log::debug("hooks-init", "Adding extension: {}", e);
+        if (it == ext.end())
             ext.push_back(e);
-        } else {
-            Log::debug("hooks-init", "Extension {} already present", e);
-        }
     }
 
     return ext;
@@ -182,4 +186,65 @@ void Utils::copyImage(VkCommandBuffer buf,
             0, nullptr, 0, nullptr,
             1, &presentBarrier);
     }
+}
+
+namespace {
+    auto& logCounts() {
+        static std::unordered_map<std::string, size_t> map;
+        return map;
+    }
+}
+
+void Utils::logLimitN(const std::string& id, size_t n, const std::string& message) {
+    auto& count = logCounts()[id];
+    if (count <= n)
+        std::cerr << "lsfg-vk: " << message << '\n';
+    if (count == n)
+        std::cerr << "(above message has been repeated " << n << " times, suppressing further)\n";
+    count++;
+}
+
+void Utils::resetLimitN(const std::string& id) noexcept {
+    logCounts().erase(id);
+}
+
+std::pair<std::string, std::string> Utils::getProcessName() {
+    const char* process_name = std::getenv("LSFG_PROCESS");
+    if (process_name && *process_name != '\0')
+        return { process_name, process_name };
+
+    const char* benchmark_flag = std::getenv("LSFG_BENCHMARK");
+    if (benchmark_flag)
+        return { "benchmark", "benchmark" };
+    std::array<char, 4096> exe{};
+
+    const ssize_t exe_len = readlink("/proc/self/exe", exe.data(), exe.size() - 1);
+    if (exe_len <= 0)
+        return { "Unknown Process", "unknown" };
+    exe.at(static_cast<size_t>(exe_len)) = '\0';
+
+    std::ifstream comm_file("/proc/self/comm");
+    if (!comm_file.is_open())
+        return { std::string(exe.data()), "unknown" };
+    std::array<char, 257> comm{};
+    comm_file.read(comm.data(), 256);
+    comm.at(static_cast<size_t>(comm_file.gcount())) = '\0';
+    std::string comm_str(comm.data());
+    if (comm_str.back() == '\n')
+        comm_str.pop_back();
+
+    return{ std::string(exe.data()), comm_str };
+}
+
+std::string Utils::getConfigFile() {
+    const char* configFile = std::getenv("LSFG_CONFIG");
+    if (configFile && *configFile != '\0')
+        return{configFile};
+    const char* xdgPath = std::getenv("XDG_CONFIG_HOME");
+    if (xdgPath && *xdgPath != '\0')
+        return std::string(xdgPath) + "/lsfg-vk/conf.toml";
+    const char* homePath = std::getenv("HOME");
+    if (homePath && *homePath != '\0')
+        return std::string(homePath) + "/.config/lsfg-vk/conf.toml";
+    return "/etc/lsfg-vk/conf.toml";
 }

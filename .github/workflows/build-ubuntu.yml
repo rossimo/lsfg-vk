@@ -1,10 +1,15 @@
 name: Build lsfg-vk on Ubuntu
-on: [push]
+on:
+  push:
+    branches: ["develop"]
 
 jobs:
   build-ubuntu:
     runs-on: ubuntu-latest
     steps:
+    - name: Prepare permissions for apt cache
+      run: |
+        sudo chmod a+rwx -R /var/cache/apt/archives
     - name: Prepare cache for apt packages
       uses: actions/cache@v4
       with:
@@ -19,7 +24,8 @@ jobs:
           clang clang-tools llvm \
           git tar \
           cmake ninja-build \
-          spirv-headers libvulkan-dev
+          spirv-headers libvulkan-dev \
+          xorg-dev xutils-dev
     - name: Checkout SPIR-V
       uses: actions/checkout@v4
       with:
@@ -36,7 +42,7 @@ jobs:
         submodules: true
     - name: Configure with CMake and Ninja
       run: |
-        cmake -B build -G Ninja \
+        CC=clang CXX=clang++ cmake -B build -G Ninja \
           -DCMAKE_BUILD_TYPE=Release \
           -DCMAKE_INSTALL_PREFIX=./build-release
     - name: Build with Ninja
@@ -52,3 +58,6 @@ jobs:
         path: |
           build-release/share/vulkan/implicit_layer.d/VkLayer_LS_frame_generation.json
           build-release/lib/liblsfg-vk.so
+    - name: Prepare permissions for apt cache
+      run: |
+        sudo chmod a+rwx -R /var/cache/apt/archives
