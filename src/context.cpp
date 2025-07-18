@@ -20,6 +20,8 @@
 #include <memory>
 #include <vector>
 #include <array>
+#include <chrono>
+#include <thread>
 
 LsContext::LsContext(const Hooks::DeviceInfo& info, VkSwapchainKHR swapchain,
         VkExtent2D extent, const std::vector<VkImage>& swapchainImages)
@@ -55,6 +57,13 @@ LsContext::LsContext(const Hooks::DeviceInfo& info, VkSwapchainKHR swapchain,
 
         if (conf.multiplier <= 1) return;
     }
+
+    const char* lsfgFramePacingStr = getenv("LSFG_FRAME_PACING");
+    const bool framePacing = lsfgFramePacingStr
+        ? *lsfgFramePacingStr == '1'
+        : false;
+    this->framePacing = framePacing;
+            
     // we could take the format from the swapchain,
     // but honestly this is safer.
     const VkFormat format = conf.hdr
@@ -123,7 +132,35 @@ LsContext::LsContext(const Hooks::DeviceInfo& info, VkSwapchainKHR swapchain,
 VkResult LsContext::present(const Hooks::DeviceInfo& info, const void* pNext, VkQueue queue,
         const std::vector<VkSemaphore>& gameRenderSemaphores, uint32_t presentIdx) {
     const auto& conf = Config::activeConf;
+
+    auto frameTimestamp = this->previousFrameTimestamp;
+    this->previousFrameTimestamp = std::chrono::high_resolution_clock::now();
+
     auto& pass = this->passInfos.at(this->frameIdx % 8);
+
+    auto frameTime = this->previousFrameTimestamp - frameTimestamp;
+    
+    const auto minFrameTime = std::chrono::nanoseconds(4166667);   // 240 FPS
+    const auto maxFrameTime = std::chrono::nanoseconds(100000000); // 10 FPS
+    frameTime = std::max(minFrameTime, std::min(frameTime, maxFrameTime));
+    
+    this->frameTimeHistory[this->frameTimeHistoryIndex] = frameTime;
+    this->frameTimeHistoryIndex = (this->frameTimeHistoryIndex + 1) % frameTimeHistorySize;
+    if (!this->frameTimeHistoryFilled && this->frameTimeHistoryIndex == 0) {
+        this->frameTimeHistoryFilled = true;
+    }
+    
+    // Calculate average frame time
+    auto averageFrameTime = std::chrono::nanoseconds(0);
+    const size_t historyCount = this->frameTimeHistoryFilled ? frameTimeHistorySize : this->frameTimeHistoryIndex;
+    if (historyCount > 0) {
+        for (size_t i = 0; i < historyCount; ++i) {
+            averageFrameTime += this->frameTimeHistory[i];
+        }
+        averageFrameTime /= historyCount;
+    } else {
+        averageFrameTime = frameTime;
+    }
 
     // 1. copy swapchain image to frame_0/frame_1
     int preCopySemaphoreFd{};
@@ -164,6 +201,8 @@ VkResult LsContext::present(const Hooks::DeviceInfo& info, const void* pNext, Vk
             preCopySemaphoreFd,
             renderSemaphoreFds);
 
+    const auto averageFrameGenTime = std::chrono::nanoseconds(static_cast<int64_t>(averageFrameTime.count() / (info.frameGen + 1)));
+  
     for (size_t i = 0; i < (conf.multiplier - 1); i++) {
         // 3. acquire next swapchain image
         pass.acquireSemaphores.at(i) = Mini::Semaphore(info.device);
@@ -172,6 +211,23 @@ VkResult LsContext::present(const Hooks::DeviceInfo& info, const void* pNext, Vk
             pass.acquireSemaphores.at(i).handle(), VK_NULL_HANDLE, &imageIdx);
         if (res != VK_SUCCESS && res != VK_SUBOPTIMAL_KHR)
             throw LSFG::vulkan_error(res, "Failed to acquire next swapchain image");
+
+        auto jitter = std::chrono::nanoseconds(0);
+
+        if (i == 0) {
+            auto frameGenTimestamp = std::chrono::high_resolution_clock::now();
+            
+            if (this->frameTimeHistoryFilled && historyCount > 1 && 
+                this->previousFrameGenTimestamp != std::chrono::high_resolution_clock::time_point{}) {
+                
+                jitter = averageFrameTime - (frameGenTimestamp - this->previousFrameGenTimestamp);
+
+                auto radius = averageFrameGenTime;
+                jitter = std::max(-radius, std::min(jitter, radius));
+            }
+
+            this->previousFrameGenTimestamp = frameGenTimestamp;
+        }
 
         // 4. copy output image to swapchain image
         pass.postCopySemaphores.at(i) = Mini::Semaphore(info.device);
@@ -209,6 +265,11 @@ VkResult LsContext::present(const Hooks::DeviceInfo& info, const void* pNext, Vk
         res = Layer::ovkQueuePresentKHR(queue, &presentInfo);
         if (res != VK_SUCCESS && res != VK_SUBOPTIMAL_KHR)
             throw LSFG::vulkan_error(res, "Failed to present swapchain image");
+
+        if (this->framePacing) {
+            Log::debug("context2", "Frame pacing - averageFrameGenTime {:.3f}ms, jitter {:.3f}ms", averageFrameGenTime.count() / 1000000.0, jitter.count() / 1000000.0);
+            std::this_thread::sleep_for(averageFrameGenTime - jitter);
+        }
     }
 
     // 6. present actual next frame
@@ -226,6 +287,6 @@ VkResult LsContext::present(const Hooks::DeviceInfo& info, const void* pNext, Vk
     if (res != VK_SUCCESS && res != VK_SUBOPTIMAL_KHR)
         throw LSFG::vulkan_error(res, "Failed to present swapchain image");
 
-    this->frameIdx++;
+    this->frameIdx++;    
     return res;
 }
