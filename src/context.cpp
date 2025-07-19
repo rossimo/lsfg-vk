@@ -201,7 +201,7 @@ VkResult LsContext::present(const Hooks::DeviceInfo& info, const void* pNext, Vk
             preCopySemaphoreFd,
             renderSemaphoreFds);
 
-    const auto averageFrameGenTime = std::chrono::nanoseconds(static_cast<int64_t>(averageFrameTime.count() / (info.frameGen + 1)));
+    const auto averageFrameGenTime = std::chrono::nanoseconds(static_cast<int64_t>(averageFrameTime.count() / (conf.multiplier + 1)));
   
     for (size_t i = 0; i < (conf.multiplier - 1); i++) {
         // 3. acquire next swapchain image
@@ -267,7 +267,6 @@ VkResult LsContext::present(const Hooks::DeviceInfo& info, const void* pNext, Vk
             throw LSFG::vulkan_error(res, "Failed to present swapchain image");
 
         if (this->framePacing) {
-            Log::debug("context2", "Frame pacing - averageFrameGenTime {:.3f}ms, jitter {:.3f}ms", averageFrameGenTime.count() / 1000000.0, jitter.count() / 1000000.0);
             std::this_thread::sleep_for(averageFrameGenTime - jitter);
         }
     }
