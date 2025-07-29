@@ -1,9 +1,10 @@
+#include <volk.h>
+#include <vulkan/vulkan_core.h>
+
 #include "v3_1/shaders/delta.hpp"
 #include "common/utils.hpp"
 #include "core/commandbuffer.hpp"
 #include "core/image.hpp"
-
-#include <vulkan/vulkan_core.h>
 
 #include <array>
 #include <optional>
@@ -317,7 +318,6 @@ void Delta::Dispatch(const Core::CommandBuffer& buf, uint64_t frameCount, uint64
     Utils::BarrierBuilder(buf)
         .addW2R(this->tempImgs2.at(0))
         .addW2R(this->tempImgs2.at(1))
-        .addW2R(this->optImg3)
         .addR2W(this->tempImgs1.at(0))
         .addR2W(this->tempImgs1.at(1))
         .build();

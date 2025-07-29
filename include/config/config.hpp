@@ -2,10 +2,9 @@
 
 #include <vulkan/vulkan_core.h>
 
+#include <filesystem>
+#include <chrono>
 #include <cstddef>
-#include <vector>
-#include <atomic>
-#include <memory>
 #include <string>
 
 namespace Config {
@@ -16,8 +15,6 @@ namespace Config {
         bool enable{false};
         /// Path to Lossless.dll.
         std::string dll;
-        /// Additional environment variables to set.
-        std::vector<std::pair<std::string, std::string>> env;
 
         /// The frame generation muliplier
         size_t multiplier{2};
@@ -30,27 +27,18 @@ namespace Config {
 
         /// Experimental flag for overriding the synchronization method.
         VkPresentModeKHR e_present;
-        /// Experimental flag for limiting the framerate of DXVK games.
-        uint32_t e_fps_limit;
 
-        /// Atomic property to check if the configuration is valid or outdated.
-        std::shared_ptr<std::atomic_bool> valid;
+        /// Path to the configuration file.
+        std::filesystem::path config_file;
+        /// File timestamp of the configuration file
+        std::chrono::time_point<std::chrono::file_clock> timestamp;
     };
 
     /// Active configuration. Must be set in main.cpp.
     extern Configuration activeConf;
 
     ///
-    /// Load the config file and create a file watcher.
-    ///
-    /// @param file The path to the configuration file.
-    ///
-    /// @throws std::runtime_error if an error occurs while loading the configuration file.
-    ///
-    void loadAndWatchConfig(const std::string& file);
-
-    ///
-    /// Reread the configuration file while preserving the old configuration
+    /// Read the configuration file while preserving the previous configuration
     /// in case of an error.
     ///
     /// @param file The path to the configuration file.

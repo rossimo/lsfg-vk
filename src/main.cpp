@@ -1,7 +1,6 @@
 #include "config/config.hpp"
 #include "extract/extract.hpp"
 #include "utils/benchmark.hpp"
-#include "utils/gui.hpp"
 #include "utils/utils.hpp"
 
 #include <unistd.h>
@@ -17,48 +16,43 @@
 
 namespace {
     __attribute__((constructor)) void lsfgvk_init() {
+        std::cerr << std::unitbuf;
+
         // read configuration
         const std::string file = Utils::getConfigFile();
         try {
-            Config::loadAndWatchConfig(file);
+            Config::updateConfig(file);
         } catch (const std::exception& e) {
-            std::cerr << "lsfg-vk: An error occured while trying to parse the configuration, exiting:\n";
+            std::cerr << "lsfg-vk: An error occured while trying to parse the configuration, IGNORING:\n";
             std::cerr << "- " << e.what() << '\n';
-            Utils::showErrorGui(e.what());
+            return; // default configuration will unload
         }
 
         const auto name = Utils::getProcessName();
         try {
             Config::activeConf = Config::getConfig(name);
         } catch (const std::exception& e) {
-            std::cerr << "lsfg-vk: The configuration for " << name.second << " is invalid, exiting:\n";
+            std::cerr << "lsfg-vk: The configuration for " << name.second << " is invalid, IGNORING:\n";
             std::cerr << e.what() << '\n';
-            Utils::showErrorGui(e.what());
+            return; // default configuration will unload
         }
 
         // exit silently if not enabled
         auto& conf = Config::activeConf;
         if (!conf.enable && name.second != "benchmark")
-            return;
+            return; // default configuration will unload
 
         // print config
         std::cerr << "lsfg-vk: Loaded configuration for " << name.second << ":\n";
         if (!conf.dll.empty()) std::cerr << "  Using DLL from: " << conf.dll << '\n';
-        for (const auto& [key, value] : conf.env)
-            std::cerr << "  Environment: " << key << "=" << value << '\n';
         std::cerr << "  Multiplier: " << conf.multiplier << '\n';
         std::cerr << "  Flow Scale: " << conf.flowScale << '\n';
         std::cerr << "  Performance Mode: " << (conf.performance ? "Enabled" : "Disabled") << '\n';
         std::cerr << "  HDR Mode: " << (conf.hdr ? "Enabled" : "Disabled") << '\n';
         if (conf.e_present != 2) std::cerr << "  ! Present Mode: " << conf.e_present << '\n';
-        if (conf.e_fps_limit > 0) std::cerr << "  ! FPS Limit: " << conf.e_fps_limit << '\n';
 
-        // update environment variables
+        // remove mesa var in favor of config
         unsetenv("MESA_VK_WSI_PRESENT_MODE"); // NOLINT
-        for (const auto& [key, value] : conf.env)
-            setenv(key.c_str(), value.c_str(), 1); // NOLINT
-        if (conf.e_fps_limit > 0)
-            setenv("DXVK_FRAME_RATE", std::to_string(conf.e_fps_limit).c_str(), 1); // NOLINT
 
         // write latest file
         try {
@@ -73,7 +67,7 @@ namespace {
         } catch (const std::exception& e) {
             std::cerr << "lsfg-vk: An error occurred while trying to write the latest file, exiting:\n";
             std::cerr << "- " << e.what() << '\n';
-            Utils::showErrorGui(e.what());
+            exit(EXIT_FAILURE);
         }
 
         // load shaders
@@ -82,7 +76,7 @@ namespace {
         } catch (const std::exception& e) {
             std::cerr << "lsfg-vk: An error occurred while trying to extract the shaders, exiting:\n";
             std::cerr << "- " << e.what() << '\n';
-            Utils::showErrorGui(e.what());
+            exit(EXIT_FAILURE);
         }
         std::cerr << "lsfg-vk: Shaders extracted successfully.\n";
 

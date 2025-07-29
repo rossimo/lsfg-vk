@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.28)
+cmake_minimum_required(VERSION 3.10)
 
 project(lsfg-vk-framegen
     DESCRIPTION "Lossless Scaling Frame Generation Backend"
@@ -34,12 +34,7 @@ target_include_directories(lsfg-vk-framegen
     PRIVATE v3.1_include
     PRIVATE v3.1p_include)
 target_link_libraries(lsfg-vk-framegen
-    PUBLIC vulkan)
-
-if(CMAKE_BUILD_TYPE STREQUAL "Release")
-    set_target_properties(lsfg-vk-framegen PROPERTIES
-        INTERPROCEDURAL_OPTIMIZATION ON)
-endif()
+    PUBLIC volk)
 
 # diagnostics
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")

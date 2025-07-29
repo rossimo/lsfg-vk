@@ -1,24 +1,22 @@
-cmake_minimum_required(VERSION 3.28)
+cmake_minimum_required(VERSION 3.10)
 
 set(CMAKE_SKIP_RPATH ON)
 
 # subprojects
 add_compile_options(-fPIC
     -Wno-deprecated-declarations
-    -Wno-unused-template
-    -Wno-tautological-compare
-    -Wno-undef)
+    -Wno-unused-template)
 
 add_subdirectory(thirdparty/dxbc EXCLUDE_FROM_ALL)
 add_subdirectory(thirdparty/pe-parse/pe-parser-library EXCLUDE_FROM_ALL)
 add_subdirectory(thirdparty/toml11 EXCLUDE_FROM_ALL)
-add_subdirectory(thirdparty/raylib EXCLUDE_FROM_ALL)
+add_subdirectory(thirdparty/volk EXCLUDE_FROM_ALL)
 add_subdirectory(framegen)
 
 # main project
 project(lsfg-vk
-    VERSION 0.0.1
-    DESCRIPTION "LSFG on Linux"
+    VERSION 0.9.0
+    DESCRIPTION "Lossless Scaling Frame Generation on Linux"
     LANGUAGES CXX)
 
 file(GLOB SOURCES
@@ -38,16 +36,11 @@ set_target_properties(lsfg-vk PROPERTIES
 target_include_directories(lsfg-vk
     PRIVATE include)
 target_link_libraries(lsfg-vk PRIVATE
-    pe-parse dxbc toml11 raylib
-    lsfg-vk-framegen vulkan)
+    pe-parse dxbc toml11
+    lsfg-vk-framegen)
 
 get_target_property(TOML11_INCLUDE_DIRS toml11 INTERFACE_INCLUDE_DIRECTORIES)
 target_include_directories(lsfg-vk SYSTEM PRIVATE ${TOML11_INCLUDE_DIRS})
-
-if(CMAKE_BUILD_TYPE STREQUAL "Release")
-    set_target_properties(lsfg-vk PROPERTIES
-        INTERPROCEDURAL_OPTIMIZATION ON)
-endif()
 
 # diagnostics
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
